@@ -1,0 +1,384 @@
+public class Graph
+{
+    public Panel Canvas;
+    public Panel Backdrop;
+    public List<List<List<decimal>>> DataList = new List<List<List<decimal>>>();
+    public List<string> SeriesNames = new List<string>();
+    public Bitmap CanvasImg;
+    private Random Rnd = new Random();
+    private List<Color> SeriesColors = new List<Color>();
+
+    public Graph(Panel CanvasObj, Panel BackropObj, List<string> SeriesNames)
+    {
+        this.Canvas = CanvasObj;
+        this.Backdrop = BackropObj;
+        this.Canvas.BackgroundImage = new Bitmap(776, 426);
+        this.CanvasImg = (Bitmap)this.Canvas.BackgroundImage;
+        this.SeriesNames = SeriesNames;
+        this.AssignColors();
+
+        this.Canvas.BackgroundImage = new Bitmap(this.Canvas.Width, this.Canvas.Height);
+        this.Backdrop.BackgroundImage = new Bitmap(this.Backdrop.Width, this.Canvas.Height);
+    }
+
+    //Graphs a scatter plot
+    public void GraphDataset_Point(int PointSize)
+    {
+        int X = 0;
+        int Y = 0;
+        int Z = 0;
+        decimal TempVal = 0;
+        decimal TempVal2 = 0;
+
+        Z = 0;
+        while (Z < this.DataList.Count)
+        {
+            X = 0;
+            while (X < this.DataList.Count)
+            {
+                TempVal = this.DataList[Z][X][0] / GetUpperBound(0) * this.Canvas.Width - 10;
+                TempVal2 = this.DataList[Z][X][1] / GetUpperBound(1) * this.Canvas.Height - 10;
+
+                Y = 0;
+                while (Y < PointSize)
+                {
+                    DrawCircle((int)TempVal, (int)TempVal2, Y + 1, this.Canvas, Color.Blue);
+
+                    Y++;
+                }
+
+                X++;
+            }
+
+            Z++;
+        }
+
+        this.Canvas.Refresh();
+    }
+
+    //Graphs a line graph
+    public void GraphDataset_Line(int PointSize)
+    {
+        int X = 0;
+        int Y = 0;
+        int Z = 0;
+        int ZZ = 0;
+        List<List<decimal>> TempSet = new List<List<decimal>>();
+        List<decimal> TempRow = new List<decimal>();
+        List<List<List<decimal>>> TempSeries = new List<List<List<decimal>>>();
+        decimal HighestVal = 0;
+        bool Flag = false;
+        decimal TempVal = 0;
+        decimal TempVal2 = 0;
+        decimal TempVal3 = 0;
+        decimal TempVal4 = 0;
+        Color TempColor;
+
+        ZZ = 0;
+        while (ZZ < this.DataList.Count)
+        {
+            TempSet = new List<List<decimal>>();
+            X = 0;
+            while (X < this.DataList[ZZ].Count)
+            {
+                TempRow = new List<decimal>();
+                TempRow.Add(this.DataList[ZZ][X][0]);
+                TempRow.Add(this.DataList[ZZ][X][1]);
+
+                //If just the first iteration overall, then assign current value to highest value
+                if (X == 0 && ZZ == 0)
+                {
+                    HighestVal = this.DataList[ZZ][X][0];
+                    TempSet.Add(TempRow);
+                }
+                else
+                {
+                    if (this.DataList[ZZ][X][0] > HighestVal)
+                    {
+                        TempSet.Add(TempRow);
+                    }
+                    else
+                    {
+                        Flag = false;
+                        Z = TempSet.Count - 1;
+                        while (Z >= 0)
+                        {
+                            if (this.DataList[ZZ][X][0] > TempSet[Z][0])
+                            {
+                                TempSet.Insert(Z + 1, TempRow);
+                                Flag = true;
+                                break;
+                            }
+
+                            Z--;
+                        }
+
+                        if (Flag == false)
+                        {
+                            TempSet.Insert(0, TempRow);
+                        }
+                    }
+                }
+
+                X++;
+            }
+            TempSeries.Add(TempSet);
+
+            ZZ++;
+        }
+
+        X = 0;
+        while (X < TempSeries.Count)
+        {
+            TempColor = this.SeriesColors[X];
+            Y = 0;
+            while (Y < TempSeries[X].Count)
+            {
+                DrawCircle(TempSeries[X][Y][0], this.Canvas.Height - TempSeries[X][Y][1], PointSize, this.Canvas, TempColor);
+
+                if (Y > 0)
+                {
+                    TempVal = (TempSeries[X][Y - 1][0] / this.Canvas.Width * this.Canvas.Width);
+                    TempVal2 = (TempSeries[X][Y - 1][1] / this.Canvas.Height) * this.Canvas.Height;
+                    TempVal3 = ((TempSeries[X][Y][0] / this.Canvas.Width) * this.Canvas.Width);
+                    TempVal4 = ((TempSeries[X][Y][1] / this.Canvas.Height)) * this.Canvas.Height;
+                    DrawLine((int)((TempVal)), (int)(this.Canvas.Height - (TempVal2)), (int)((TempVal3)), (int)(this.Canvas.Height - (TempVal4)), this.Canvas, TempColor);
+
+                }
+
+                Y++;
+            }
+
+            X++;
+        }
+
+        this.DrawLabels();
+        this.Canvas.Refresh();
+    }
+
+    //Gives a random color to each series on the graph
+    private void AssignColors()
+    {
+        int X = 0;
+        Color TempColor;
+
+        while (X < this.SeriesNames.Count)
+        {
+            TempColor = Color.FromArgb(Rnd.Next(150, 256), Rnd.Next(150, 256), Rnd.Next(150, 256), 255);
+            this.SeriesColors.Add(TempColor);
+
+            X++;
+        }
+    }
+
+    public void DrawCircle(decimal XCoord, decimal YCoord, int Radius, Panel CanvasObj, Color ColorVal)
+    {
+        decimal NewX = 0;
+        decimal NewY = 0;
+        int X = 0;
+        int Y = 1;
+        Bitmap TempBMP;
+
+        while (Y <= Radius)
+        {
+            X = 0;
+            while (X < 361)
+            {
+                NewX = (decimal)((double)XCoord + Y * Math.Cos(X));
+                NewY = (decimal)((double)YCoord + Y * Math.Sin(X));
+
+                if (NewX > 0 && NewX < CanvasObj.Width && NewY > 0 && NewY < CanvasObj.Height)
+                {
+                    TempBMP = (Bitmap)(CanvasObj.BackgroundImage);
+                    TempBMP.SetPixel((int)NewX, (int)NewY, ColorVal);
+                }
+
+                X++;
+            }
+
+            Y++;
+        }
+    }
+
+    public void DrawLine(int X1, int Y1, int X2, int Y2, Panel CanvasObj, Color ColorVal)
+    {
+        double TempVal = 0;
+        double TempVal2 = 0;
+        double HypotenuseLength = 0;
+        int X = 0;
+
+        TempVal = (Y1 - Y2);
+        TempVal2 = (X1 - X2);
+
+        HypotenuseLength = Math.Sqrt(Math.Pow(TempVal, 2) + Math.Pow(TempVal2, 2));
+
+        while (X < HypotenuseLength)
+        {
+            TempVal = X1 - ((X * (X1 - X2)) / HypotenuseLength);
+            TempVal2 = Y1 - ((X * (Y1 - Y2)) / HypotenuseLength);
+
+            DrawCircle((int)TempVal, (int)TempVal2, 1, CanvasObj, ColorVal);
+
+            X++;
+        }
+    }
+
+    //Draws the axis labels
+    public void DrawLabels()
+    {
+        Label TempLbl = new Label();
+        decimal TempVal = 0;
+        decimal TempVal2 = 0;
+        int X = 0;
+
+        TempVal = GetUpperBound(0);
+        TempVal2 = GetUpperBound(1);
+
+        //Zero Label
+        TempLbl.Text = ("0");
+        TempLbl.Top = this.Canvas.Height + 25;
+        TempLbl.Left = this.Canvas.Left - 25;
+        TempLbl.Width = 10;
+        this.Backdrop.Controls.Add(TempLbl);
+
+        //Horizontal bars
+        X = 0;
+        while (X < 9)
+        {
+            this.DrawLine(this.Backdrop.Left - 20, (int)(((this.Canvas.Height / 9) * (9 - (X)))) - (TempLbl.Height / 2) - 10, this.Canvas.Width, (int)(((this.Canvas.Height / 9) * (9 - (X)))) - (TempLbl.Height / 2) - 10, this.Canvas, Color.LightGray);
+
+            X++;
+        }
+
+        //X Axis
+        X = 0;
+        while (X < 9)
+        {
+            //Actual numeric labels
+            TempLbl = new Label();
+            TempLbl.Text = ((int)((GetUpperBound(0) / 9) * (X + 1))).ToString();
+            TempLbl.Top = this.Canvas.Height + 40;
+            TempLbl.Left = (int)((this.Canvas.Width / 9) * (X + 2));
+            TempLbl.Width = 50;
+            TempLbl.Height = 20;
+
+            this.Backdrop.Controls.Add(TempLbl);
+
+            //Tick mark
+            TempLbl = new Label();
+            TempLbl.Text = "|";
+            TempLbl.Top = this.Canvas.Height + 20;
+            TempLbl.Left = (int)(((this.Canvas.Width / 9) * (X + 2)) + 5);
+            TempLbl.Width = 10;
+
+            this.Backdrop.Controls.Add(TempLbl);
+
+            X++;
+        }
+
+        //Y Axis
+        X = 0;
+        while (X < 9)
+        {
+            //Actual numeric labels
+            TempLbl = new Label();
+            TempLbl.Text = ((int)((GetUpperBound(1) / 9) * (X + 1))).ToString();
+            TempLbl.Top = (int)(((this.Canvas.Height / 9) * (9 - (X))));
+            TempLbl.Left = this.Canvas.Left - 25;
+            TempLbl.Width = 40;
+            TempLbl.Height = 20;
+
+            this.Backdrop.Controls.Add(TempLbl);
+
+            X++;
+        }
+
+        //Series labels
+        X = 0;
+        while (X < this.SeriesNames.Count)
+        {
+            TempLbl = new Label();
+            TempLbl.Text = this.SeriesNames[X];
+            TempLbl.Top = (int)((this.Canvas.Height / this.SeriesNames.Count) + ((X + 1) * 30));
+            TempLbl.Left = this.Canvas.Right + 10;
+            TempLbl.ForeColor = this.SeriesColors[X];
+            TempLbl.Height = 20;
+            TempLbl.Font = new Font(TempLbl.Font, FontStyle.Bold);
+
+            this.Backdrop.Controls.Add(TempLbl);
+
+
+            X++;
+        }
+
+    }
+
+    //Gets lowest value of all data sets for a certain column
+    public decimal GetLowerBound(int Column)
+    {
+        int X = 0;
+        int Y = 0;
+        decimal TempVal = 0;
+
+        Y = 0;
+        while (Y < this.DataList.Count)
+        {
+            X = 0;
+            while (X < this.DataList.Count)
+            {
+                if (X == 0 && Y == 0)
+                {
+                    TempVal = this.DataList[Y][X][Column];
+                }
+                else
+                {
+                    if (this.DataList[Y][X][Column] < TempVal)
+                    {
+                        TempVal = this.DataList[Y][X][Column];
+                    }
+                }
+
+                X++;
+            }
+
+            Y++;
+        }
+
+
+        return TempVal;
+    }
+
+    //Gets highest value of all data sets for a certain column
+    public decimal GetUpperBound(int Column)
+    {
+        int X = 0;
+        int Y = 0;
+        decimal TempVal = 0;
+
+        Y = 0;
+        while (Y < this.DataList.Count)
+        {
+            X = 0;
+            while (X < this.DataList.Count)
+            {
+                if (X == 0 && Y == 0)
+                {
+                    TempVal = this.DataList[Y][X][Column];
+                }
+                else
+                {
+                    if (this.DataList[Y][X][Column] > TempVal)
+                    {
+                        TempVal = this.DataList[Y][X][Column];
+                    }
+                }
+
+                X++;
+            }
+
+            Y++;
+        }
+
+        return TempVal;
+    }
+}
