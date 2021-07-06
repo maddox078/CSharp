@@ -1,3 +1,6 @@
+//This class is to be used with WinForms to allow for full data graphing capabilities that can be displayed on a Panel control type
+//I primarily use this to monitor/graph the performance of my neural networks during training
+
 public class Graph
 {
     public Panel Canvas;
