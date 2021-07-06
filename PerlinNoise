@@ -1,0 +1,140 @@
+//This is an implementation of the Perlin Noise algorithm, used for generating natural looking artificial noise
+//Used widely in procedural texture work
+
+public class PerlinNoise
+{
+	private class Cell
+	{
+		public int XCoord;
+		public int YCoord;
+		public List<double> VectorObj = new List<double>();
+	}
+
+	int GridWidth = 25;
+	int GridHeight = 25;
+	Panel DrawPanel;
+	Cell[,] Grid = new Cell[25, 25];
+	int R;
+	int G;
+	int B;
+
+	public PerlinNoise(Panel TargetPanel,int RVal,int GVal,int BVal)
+	{
+		DrawPanel = TargetPanel;
+
+		this.R = RVal;
+		this.G = GVal;
+		this.B = BVal;
+
+		this.Initialize();
+	}
+
+	public void Initialize()
+	{
+		int X = 0;
+		int Y = 0;
+		List<double> TempList;
+		Random Rnd;
+		double TempVal1;
+		double TempVal2;
+
+		this.GridHeight = 512;
+		this.GridWidth = 512;
+		this.Grid = new Cell[this.GridHeight, this.GridWidth];
+
+		Rnd = new Random();
+
+		while (X < this.GridHeight)
+		{
+			Y = 0;
+			while (Y < this.GridWidth)
+			{
+				Cell NewCell = new Cell();
+				NewCell.XCoord = Y;
+				NewCell.YCoord = X;
+
+				TempVal1 = Rnd.NextDouble();
+				NewCell.VectorObj.Add(TempVal1);
+
+				TempVal2 = Rnd.NextDouble();
+				NewCell.VectorObj.Add(TempVal2);
+
+				this.Grid[X, Y] = NewCell;
+
+				Y++;
+			}
+			X++;
+		}
+	}
+	
+	public void Run()
+	{
+		int X = 0;
+		int Y = 0;
+		double OutVal;
+		Bitmap TempImage = new Bitmap(512,512);
+
+		while (Y < this.GridHeight - 1)
+		{
+			X = 0;
+			while (X < this.GridWidth - 1)
+			{
+				OutVal = this.FindValueAt(Y, X) * 255;
+
+				if (OutVal > 255)
+				{
+					OutVal = 255;
+				}
+
+				TempImage.SetPixel(X, Y, Color.FromArgb((int)(OutVal), this.R, this.G, this.B));
+
+
+				X++;
+			}
+
+			Y++;
+		}
+
+		DrawPanel.BackgroundImage = TempImage;
+		DrawPanel.Refresh();
+	}
+
+	public double FindValueAt(int Y, int X)
+	{
+		List<double> TempList;
+		List<List<double>> Corners = new List<List<double>>();
+		List<double> Results = new List<double>();
+		Random Rnd;
+		double ResultVal;
+		double TempVal1;
+		double TempVal2;
+		int i;
+
+		Corners.Add(this.Grid[Y, X].VectorObj);
+		Corners.Add(this.Grid[Y, X + 1].VectorObj);
+		Corners.Add(this.Grid[Y + 1, X].VectorObj);
+		Corners.Add(this.Grid[Y + 1, X + 1].VectorObj);
+
+		TempList = new List<double>();
+
+		i = 0;
+		while (i < Corners.Count)
+		{
+			TempList.Add((Corners[i][0] * this.Grid[Y, X].VectorObj[0]) + (Corners[i][1] * this.Grid[Y, X].VectorObj[1]));
+
+			i++;
+		}
+
+		TempVal1 = this.Interpolate(TempList[0], TempList[1]);
+		TempVal2 = this.Interpolate(TempList[2], TempList[3]);
+		ResultVal = this.Interpolate(TempVal1, TempVal2);
+
+		return ResultVal;
+	}
+
+	public double Interpolate(double Val1, double Val2)
+	{
+		return (1.0f - 0.9) * Val1 + (Val2 * 0.9);
+	}
+}
+
