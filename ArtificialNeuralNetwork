@@ -1,0 +1,568 @@
+//This is a high level object model for designing a recurrent neural network
+//It currently supports three different activation functions and support for passing in both learning rate and momentum factor
+//This class was not designed for performance, rather to present an intuitive means for interacting with an otherwise complex subject
+//This architecture has successfully performed color and object recognition
+
+public class NeuralNetwork
+{
+    //Helper classes
+	public class Dendrite
+    {
+        public double Weight;
+
+        public Dendrite(double InputVal)
+        {
+            this.Weight = InputVal;
+        }
+
+        public Dendrite()
+        {
+        }
+    }
+
+	public class Neuron
+    {
+        public int Layer;
+        public double Value;
+        public double NetInput;
+        public double Bias;
+        public Dendrite[] Dendrites;
+        public double Error = 0;
+        public List<MetaDendrite> MetaDendrites  = new List<MetaDendrite>();
+    }
+
+    public class Layer
+    {
+        public Neuron[] Neurons;
+        public int LayerID;
+        public double TotalLayerError = 0;
+
+        public Layer(int LayerNum)
+        {
+            this.LayerID = LayerNum;
+        }
+    }
+
+
+
+    //Properties
+    public List<int> LayerCounts;
+    public Layer[] Layers;
+    public List<Neuron> Neurons = new List<Neuron>();
+    public double LearningRate;
+    public Random Rnd;
+    public double Momentum;
+    public int ActivationFunctionID = 0;
+    private double LastTotalError = 1;
+    private double CurrentTotalError = 0;
+
+
+
+    //Methods
+    public void InitializeNeuralNetwork(List<int> LayerObj,double Rate,int FunctionID)
+	{
+        int X = 0;
+        int Y = 0;
+        int Z = 0;
+        double TempVal = 0;
+        Neuron TempNeuron;
+        Dendrite TempDendrite;
+        Layer TempLayer;
+        List<Dendrite> TempListDendrite;
+        List<Neuron> TempNeuronList;
+        List<Layer> TempLayerList;
+
+        //Initialize properties
+        this.LayerCounts = LayerObj;
+        this.LearningRate = Rate;
+        this.Rnd = new Random();
+        this.ActivationFunctionID = FunctionID;
+
+        this.Layers = new Layer[1];
+        TempLayerList = new List<Layer>();        
+
+        //For each layer....
+        while (X < LayerObj.Count)
+        {
+            TempNeuronList = new List<Neuron>();
+            TempLayer = new Layer(X);                        
+            Y = 0;
+
+            //For each neuron....
+            while (Y < LayerObj[X])
+            {
+                TempNeuron = new Neuron();
+                TempNeuron.Layer = X;
+                
+                //NOTE: If your input values into the network are large, in scalar terms (>255), you should keep these pretty small to prevent overflow
+                //0.9 can be replaced with any value where 0 < X < 1
+                if(X == 0)
+                {
+                    TempNeuron.Bias = (double) (this.Rnd.NextDouble() * 0.9);
+                    //TempNeuron.Bias = 0;
+                }
+                else
+                {
+                    TempNeuron.Bias = (double) (this.Rnd.NextDouble() * 0.9);
+                    //TempNeuron.Bias = 0;
+                }
+
+                TempVal = 0;
+
+                Z = 0;
+                if (X == 0)
+                {
+                    TempVal = LayerObj[0];
+                }
+                else
+                {
+                    TempVal = LayerObj[X-1];
+                }
+
+                TempListDendrite = new List<Dendrite>();
+
+                //For each dendrite....
+                while (Z < TempVal)
+                {
+                    TempDendrite = new Dendrite();
+
+                    //NOTE: If your input values into the network are large, in scalar terms (>255), you should keep these pretty small to prevent overflow
+                    //0.9 can be replaced with any value where 0 < X < 1
+                    if (X == 0)
+                    {
+                        TempDendrite.Weight = (double) (this.Rnd.NextDouble() * 0.9);
+                    }
+                    else
+                    {
+                        TempDendrite.Weight = (double) (this.Rnd.NextDouble() * 0.9);
+                    }
+
+                    TempListDendrite.Add(TempDendrite);              
+
+                    Z++;
+                }
+
+                //Add list of generated dendrites
+                TempNeuron.Dendrites = TempListDendrite.ToArray();
+                TempNeuronList.Add(TempNeuron);
+
+                Y++;
+            }
+
+            //Add list of generated neurons
+            TempLayer.Neurons = TempNeuronList.ToArray();
+            TempLayerList.Add(TempLayer);
+            
+
+            X++;
+        }
+
+        //Add list of generated layers
+        this.Layers = TempLayerList.ToArray();
+	}
+
+    public void FeedForward(List<double> Inputs)
+    {
+        int X = 1;
+        int Y = 0;
+        int Z = 0;
+        double NetSignal = 0;
+        double NetSignal2 = 0;
+        List<double> TempList = new List<double>();
+
+        Y = 0;
+        while(Y < Inputs.Count)
+        {
+            NetSignal += Inputs[Y];
+
+            Y++;
+        }
+
+        //Set input layer neuron values to the input data values
+        Y = 0;
+        while (Y < this.Layers[0].Neurons.Length)
+        {
+            this.Layers[0].Neurons[Y].Value = Inputs[Y] / NetSignal;
+
+            Y++;
+        }
+
+        while (X < this.Layers.Length)
+        {
+            TempList = new List<double>();
+            NetSignal2 = 0;
+            Y = 0;
+            while(Y < this.Layers[X].Neurons.Length)
+            {
+                Z = 0;
+                NetSignal = 0;
+
+                //Sum up the net input signal into the current neuron
+                while (Z < this.Layers[X].Neurons[Y].Dendrites.Length)
+                {
+                    NetSignal += this.Layers[X].Neurons[Y].Dendrites[Z].Weight * this.Layers[X - 1].Neurons[Z].Value;
+
+                    Z++;
+                }
+
+                NetSignal += this.Layers[X].Neurons[Y].Bias;
+
+                this.Layers[X].Neurons[Y].NetInput = NetSignal;
+                this.Layers[X].Neurons[Y].Value = this.ActivationFunction(NetSignal, this.ActivationFunctionID);
+
+                Y++;
+            }
+
+            X++;
+        }
+    }
+
+    public void UpdateLearningRate()
+    {
+        double ErrorVal = 0;
+
+        ErrorVal = this.LearningRate * (1 / (1 + Math.Abs(CalculateNetworkError() - this.LastTotalError)));
+        this.LearningRate = ErrorVal;
+
+        Debug.Print("LEARNING RATE:" + ErrorVal.ToString());
+
+        this.LastTotalError = ErrorVal;
+    }
+
+    //Uses MSE (Mean Squared Error)
+    private double CalculateNetworkError()
+    {
+        int X = 0;
+        double TempVal = 0;
+
+        while(X < this.Layers[this.Layers.Length -1].Neurons.Length)
+        {
+            TempVal += (double)this.Layers[this.Layers.Length - 1].Neurons[X].Error;
+
+            X++;
+        }
+
+        TempVal = (TempVal / this.Layers[this.Layers.Length - 1].Neurons.Length);
+        TempVal *= TempVal;
+
+        return TempVal;
+    }
+
+    public void BackPropagate(List<double> Inputs,List<double> Actuals)
+    {
+        int X = 0;
+        int Y = 0;
+        int Z = 0;
+        double TempVal = 0;
+        double TempVal2 = 0;
+        double TempVal3 = 0;
+        double TempVal4 = 0;
+        List<double> Errors = new List<double>();
+        List<List<List<double>>> NewWeights = new List<List<List<double>>>();
+        List<double> TempWeights = new List<double>();
+        List<List<double>> TempWeights2 = new List<List<double>>();
+        
+        //To have an error value to mitigate, we must first generate output for the network
+        this.FeedForward(Inputs);
+
+        X = this.Layers.Length - 1;        
+        this.Layers[X].TotalLayerError = 0;
+        TempWeights2 = new List<List<double>>();
+
+        //Calculate error for output layer
+        Y = 0;
+        while (Y < this.Layers[X].Neurons.Length)
+        {
+            //This error value is only for measuring network performance, look up Mean Squared Error
+            TempVal = 0.5 * ((this.Layers[X].Neurons[Y].Value - Actuals[Y]) * (this.Layers[X].Neurons[Y].Value - Actuals[Y]));
+            
+            //Actual error value of the output neuron
+            this.Layers[X].Neurons[Y].Error = this.Layers[X].Neurons[Y].Value - Actuals[Y] ;
+
+            TempWeights = new List<double>();            
+            Z = 0;
+            while(Z < this.Layers[X].Neurons[Y].Dendrites.Length)
+            {
+                TempVal = (double) this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y].Value,this.ActivationFunctionID);
+                TempVal2 = (double) (this.Layers[X].Neurons[Y].Value - Actuals[Y] ) * (double) this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y].Value,this.ActivationFunctionID) * (this.Layers[X - 1].Neurons[Z].Value);
+                TempVal3 = (this.Layers[X].Neurons[Y].Dendrites[Z].Weight - TempVal2 * (double)this.LearningRate);
+
+                TempWeights.Add(this.Layers[X].Neurons[Y].Dendrites[Z].Weight - TempVal2 * (double)this.LearningRate * this.Momentum) ;
+
+                Z++;
+            }
+
+            TempWeights2.Add(TempWeights);
+
+            Y++;
+        }
+
+        NewWeights.Add(TempWeights2);
+
+        //Propagate error through hidden layers
+        X = this.Layers.Length - 2;
+        while (X > 0)
+        {
+            TempWeights2 = new List<List<double>>();
+            Y = 0;
+            while (Y < this.Layers[X].Neurons.Length)
+            {
+               
+                TempWeights = new List<double>();
+                TempVal2 = 0;
+                Z = 0;
+                while(Z < this.Layers[X+1].Neurons.Length)
+                {
+                    TempVal = (double)(this.Layers[X + 1].Neurons[Z].Error) * (double) this.ActivationFunctionDerivative(this.Layers[X + 1].Neurons[Z].Value,this.ActivationFunctionID) * this.Layers[X + 1].Neurons[Z].Dendrites[Y].Weight;
+                    TempVal2 += TempVal;
+
+                    Z++;
+                }
+
+                this.Layers[X].Neurons[Y].Error = TempVal2;
+
+                TempVal3 = 0;
+                Z = 0;
+                while(Z < this.Layers[X].Neurons[Y].Dendrites.Length)
+                {
+                    if(X == 0)
+                    {
+                        TempVal3 = (double)TempVal2 * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y].Value, this.ActivationFunctionID) * (Inputs[Z]);
+                    }
+                    else
+                    {
+                        TempVal3 = (double)TempVal2 * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y].Value, this.ActivationFunctionID) * (this.Layers[X - 1].Neurons[Z].Value);
+                    }
+                    
+                    TempVal4 = this.Layers[X].Neurons[Y].Dendrites[Z].Weight - TempVal3 * (double)this.LearningRate;
+                    
+                    TempWeights.Add(this.Layers[X].Neurons[Y].Dendrites[Z].Weight - TempVal3 * (double)this.LearningRate * this.Momentum);
+
+                    Z++;
+                }
+
+                TempWeights2.Add(TempWeights);
+
+                Y++;
+            }
+
+            NewWeights.Add(TempWeights2);
+
+            X--;
+        }
+
+        //Batch weight update
+        X = 0;
+        while (X < NewWeights.Count)
+        {
+            Y = 0;
+            while (Y < NewWeights[X].Count)
+            {
+                Z = 0;
+                while (Z < NewWeights[X][Y].Count)
+                {
+                    this.Layers[this.Layers.Length - 1 - X].Neurons[Y].Dendrites[Z].Weight = NewWeights[X][Y][Z];
+
+                    Z++;
+                }
+
+                Y++;
+            }
+
+            X++;
+        }
+    }
+
+	//Loads an existing network configuration from file
+    public NeuralNetwork LoadNetwork(string FilePath)
+    {
+        NeuralNetwork NewANN = new NeuralNetwork();
+        Regex Regx;
+        Regex Regx2;
+        Regex Regx3;
+        MatchCollection TempCol;
+        MatchCollection TempCol2;
+        MatchCollection TempCol3;
+        int X = 0;
+        int Y = 0;
+        int Z = 0;
+        string FileStr = "";
+        string TempStr = "";
+        List<Dendrite> TempDendrites;
+        List<Neuron> TempNeurons;
+        List<Layer> TempLayers;
+        Neuron TempNeuron;
+        Layer TempLayer;
+
+        FileStr = System.IO.File.ReadAllText(FilePath);
+
+        TempLayers = new List<Layer>();
+        Regx = new Regex("(?:\\<LAYER\\>)([\n\\s\\S]*?)(?:\\<\\/LAYER\\>)");
+        TempCol = Regx.Matches(FileStr);
+        X = 0;
+
+        while(X < TempCol.Count)
+        {
+            TempLayer = new Layer(X);
+            TempNeurons = new List<Neuron>();
+            Regx2 = new Regex("(?:\\<NEURON\\>)([\n\\s\\S]*?)(?:\\<\\/NEURON\\>)");
+            TempCol2 = Regx2.Matches(TempCol[X].Value);
+            Y = 0;
+
+            while(Y < TempCol2.Count)
+            {
+                TempNeuron = new Neuron();
+                TempDendrites = new List<Dendrite>();
+                Regx3 = new Regex("(?:\\<DENDRITE\\>)([\n\\s\\S]*?)(?:\\<\\/DENDRITE\\>)");
+                TempCol3 = Regx3.Matches(TempCol2[Y].Value);
+                Z = 0;
+
+                while(Z < TempCol3.Count)
+                {
+                    TempDendrites.Add(new Dendrite((double) Double.Parse(TempCol3[Z].Value.ToString().Replace("DENDRITE","").Replace("<","").Replace("/","").Replace(">",""))));
+
+                    Z++;
+                }
+
+                TempNeuron.Dendrites = TempDendrites.ToArray();
+
+                Regx3 = new Regex("(?:\\<ERROR\\>)([\n\\s\\S]*?)(?:\\<\\/ERROR\\>)");
+                TempCol3 = Regx3.Matches(TempCol2[Y].Value);
+                TempNeuron.Error = (double) Double.Parse(TempCol3[0].Value.ToString().Replace("ERROR","").Replace("<","").Replace("/","").Replace(">",""));
+
+                Regx3 = new Regex("(?:\\<BIAS\\>)([\n\\s\\S]*?)(?:\\<\\/BIAS\\>)");
+                TempCol3 = Regx3.Matches(TempCol2[Y].Value);
+                TempNeuron.Bias = (double)Double.Parse(TempCol3[0].Value.ToString().Replace("BIAS", "").Replace("<", "").Replace("/", "").Replace(">", ""));
+
+                Regx3 = new Regex("(?:\\<VALUE\\>)([\n\\s\\S]*?)(?:\\<\\/VALUE\\>)");
+                TempCol3 = Regx3.Matches(TempCol2[Y].Value);
+                TempNeuron.Value = (double)Double.Parse(TempCol3[0].Value.ToString().Replace("VALUE", "").Replace("<", "").Replace("/", "").Replace(">", ""));
+
+                TempNeurons.Add(TempNeuron);
+
+                Y++;
+            }
+
+            TempLayer.Neurons = TempNeurons.ToArray();
+            TempLayers.Add(TempLayer);
+
+            X++;
+        }
+
+        NewANN.Layers = TempLayers.ToArray();
+
+        return NewANN;
+    }
+
+	//Save current network configuration (once it has been fully trained)
+    public void SaveNetwork(string FilePath)
+    {
+        string TempStr = "";
+        int X = 0;
+        int Y = 0;
+        int Z = 0;
+        StringBuilder StringBldr = new StringBuilder();
+
+        StringBldr.Append("<LEARNRATE>" + this.LearningRate + "</LEARNRATE>\n");
+
+        while(X < this.Layers.Length)
+        {
+            StringBldr.Append("<LAYER>\n\t<ID>" + X.ToString() + "</ID>\n");
+            Y = 0;
+
+            while(Y < this.Layers[X].Neurons.Length)
+            {
+                StringBldr.Append("\t<NEURON>\n\t\t<ERROR>" + this.Layers[X].Neurons[Y].Error.ToString() + "</ERROR>\n\t\t<BIAS>" + this.Layers[X].Neurons[Y].Bias.ToString() + "</BIAS>\n\t\t<VALUE>" + this.Layers[X].Neurons[Y].Value.ToString() + "</VALUE>\n");
+                Z = 0;
+                
+                while(Z < this.Layers[X].Neurons[Y].Dendrites.Length)
+                {
+                    StringBldr.Append("\t\t<DENDRITE>" + this.Layers[X].Neurons[Y].Dendrites[Z].Weight.ToString() + "</DENDRITE>\n");
+
+                    Z++;
+                }
+                
+                StringBldr.Append("\t</NEURON>\n");
+
+                Y++;
+            }
+
+            StringBldr.Append("</LAYER>\n");
+
+            X++;
+        }
+
+        System.IO.File.WriteAllText(FilePath, StringBldr.ToString());
+    }
+
+    //Highly recommend using ReLu, much newer and more efficient
+    public double ActivationFunction(double InputVal,int FunctionID)
+    {
+        double TempVal = 0;
+        
+        //Leaky ReLu requires a specific small constant for optimization, can be anything < 1 and > 0
+        double ReLUConst = 0.1;
+
+        //Runs the activation function that correlates to the ActivationFunctionID network parameter
+        switch(FunctionID)
+        {
+            //TanH
+            case 1:
+                TempVal = (double)Math.Tanh((double)InputVal);
+                break;
+            //Logistic Sigmoid
+            case 2:
+                TempVal = (double)(1 / (1 + ( Math.Pow((double)Math.E, -1 * ((double)InputVal * ReLUConst)))));
+                break;
+            //Leaky ReLu (Regressive Linear Unit)
+            case 3:
+                if(InputVal < 0)
+                {
+                    TempVal = ReLUConst * InputVal;
+                }
+                else
+                {
+                    TempVal = InputVal;
+                }
+
+                break;
+        }
+
+        return TempVal;
+    }
+
+    public double ActivationFunctionDerivative(double InputVal,int FunctionID)
+    {
+        double TempVal = 0;
+
+        //Leaky ReLu requires a specific small constant for optimization, can be anything < 1 and > 0
+        double ReLUConst = 0.1;
+
+        //Runs the activation function DERIVATIVE that correlates to the ActivationFunctionID network parameter
+        switch (FunctionID)
+        {
+            //TanH
+            case 1:
+                TempVal =  (double)(1 - (Math.Tanh((double)InputVal) * Math.Tanh((double)InputVal)));
+                break;
+            //Logistic Sigmoid
+            case 2:
+                TempVal = InputVal * (1 - InputVal);
+                break;
+            //Leaky ReLu (Regressive Linear Unit)
+            case 3:                
+                if(InputVal < 0)
+                {
+                    TempVal = ReLUConst;
+                }
+                else
+                {
+                    TempVal = 1;
+                }
+                break;
+        }
+
+        return TempVal;
+    }
+
+}
