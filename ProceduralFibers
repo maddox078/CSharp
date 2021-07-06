@@ -1,0 +1,83 @@
+//A procedural fiber pattern generator, based on this research: https://www.cs.cornell.edu/~kb/publications/proccloth-egsr17.pdf
+//Still a work in progress!
+
+class FIber
+{
+	public Bitmap MainImg = new Bitmap(512, 512);
+	public double MasterPitch;
+
+	public List<double> GetCoordinate(double Radius,double Pitch,int ZVal)
+	{
+		List<double> TempList = new List<double>();
+		double TempVal1;
+		double TempVal2;
+
+		TempVal1 = Radius * Math.Cos(Pitch + ((2 * Math.PI * ZVal) / ZVal));
+		TempVal2 = Radius * Math.Sin(Pitch + ((2 * Math.PI * ZVal) / ZVal));
+
+		TempList.Add(TempVal1);
+		TempList.Add(TempVal2);
+
+		return TempList;
+	}
+
+	public void DrawFiber(Panel TargetCanvas, double Radius,double CycleLength,double ThetaIncrement, double DensityFactor,double RVarianceMin,double RVarianceMax)
+	{
+		//RMin & RMax will affect how fuzzy the fiber looks
+
+		int X = 1;
+		List<double> TempList = new List<double>();
+		double RMin = RVarianceMin;
+		double RMax = RVarianceMax;
+		double FiberFlyawayMin = 0;
+		double FiberFlyawayMax = 0;
+		double TempX = 0;
+		double TempY = 0;
+		Bitmap TargetImg = (Bitmap)TargetCanvas.BackgroundImage;
+		double TempRadius = 0;
+		double TwoPi = Math.PI * 2;
+		double Z = 0;
+		Random Rnd = new Random();
+
+		//Total length of helix
+		double A = CycleLength;
+
+		//The period of one cycle of the helix function
+		double S = 1;
+
+		//The sample angle, should increase over time
+		double Theta = ThetaIncrement;  
+
+		while(Radius > 0)
+		{
+			Z= 1;
+			while (Z < TargetImg.Width)
+			{
+				Theta += ThetaIncrement;
+				TempRadius = ((RMin * Radius) + ((RMax - RMin) / 2) * Radius) * (Math.Cos(S * ((TwoPi * Z) / A) + Theta) + 1);
+
+				TempX = TempRadius * Math.Cos(Theta + ((TwoPi * Z) / A));
+				TempY = TempRadius * Math.Sin(Theta + ((TwoPi * Z) / A));
+
+				TempY += TargetImg.Height / 2;
+
+				if (TempX < 0 || TempX > TargetImg.Width || TempY < 0 || TempY > TargetImg.Height)
+				{
+
+				}
+				else
+				{
+					TargetImg.SetPixel((int)Z, (int)TempY, Color.Black);
+				}
+
+				Z++;
+			}
+
+			Radius -= DensityFactor;
+		}
+
+
+
+		TargetCanvas.Refresh();
+	}
+}
