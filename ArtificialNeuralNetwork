@@ -1,5 +1,5 @@
 //This is a high level object model for designing a recurrent neural network
-//It currently supports three different activation functions and support for passing in both learning rate and momentum factor
+//It currently supports three different activation functions, support for passing in both learning rate and momentum factor, as well as multiple hidden layers
 //This class was not designed for performance, rather to present an intuitive means for interacting with an otherwise complex subject
 //This architecture has successfully performed color and object recognition
 
