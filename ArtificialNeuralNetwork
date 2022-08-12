@@ -69,7 +69,7 @@ public class NeuralNetwork
     public double LearningRate;
     public Random Rnd;
     public double Momentum = 0.7;
-    public int ActivationFunctionID = 0;
+    public int ActivationFunctionID = 3;
     private double LastTotalError = 1;
     private double CurrentTotalError = 0;
     public double IOScaleFactor = 1;
@@ -78,8 +78,9 @@ public class NeuralNetwork
     public double M = 0;
     public double V = 0;
     public int TrainingIteration = 0;
-    public double ReLUConst = 0.001;
+    public double ReLUConst = 0.00001;
     private double InitialLearningRate;
+    public int NormalizationMethod = 0;
 
     //Methods
     public void InitializeNeuralNetwork(List<int> LayerObj, double Rate, int FunctionID,double IOScalingFactor,double ParameterScalingFactor)
@@ -89,7 +90,7 @@ public class NeuralNetwork
         int Z = 0;
         double TempVal = 0;
         double TempVal2 = 0;
-        double WeightRange = 0.9f;
+        double WeightRange = 0.999f;
         Neuron TempNeuron;
         Dendrite TempDendrite;
         Layer TempLayer;
@@ -118,7 +119,7 @@ public class NeuralNetwork
 
             TempLayer.BiasNeuron = new Bias();
             //TempLayer.BiasNeuron.Weight = (double)(this.Rnd.NextDouble() * WeightRange);
-            TempLayer.BiasNeuron.Weight = 0.1;
+            TempLayer.BiasNeuron.Weight = 1.0f;
 
             TempLayer.BiasNeuron.Value = 1.0f;
             
@@ -168,14 +169,14 @@ public class NeuralNetwork
                     //0.9 can be replaced with any value where 0 < X < 1
                     if (X == 0)
                     {
-                        //TempVal2 = (double)(ParameterScalingFactor * (this.Rnd.NextDouble() * 0.9f));
-                        TempVal2 = (double)(ParameterScalingFactor * (this.Rnd.NextDouble() * WeightRange) * (2.0f / LayerObj[X]));
+                        TempVal2 = (double)(ParameterScalingFactor * (this.Rnd.NextDouble() * 0.9));
+                        //TempVal2 = (double)(ParameterScalingFactor * (this.Rnd.NextDouble() * WeightRange) * (2.0f / LayerObj[X]));
                         TempDendrite.Weight = TempVal2;
                     }
                     else
                     {
-                        //TempVal2 = (double)(ParameterScalingFactor * (this.Rnd.NextDouble() * 0.9f));
-                        TempVal2 = (double)(ParameterScalingFactor * (this.Rnd.NextDouble() * WeightRange) * (2.0f / LayerObj[X - 1]));
+                        TempVal2 = (double)(ParameterScalingFactor * (this.Rnd.NextDouble() * 0.9));
+                        //TempVal2 = (double)(ParameterScalingFactor * (this.Rnd.NextDouble() * WeightRange) * (2.0f / LayerObj[X - 1]));
                         TempDendrite.Weight = TempVal2;
                     }
 
@@ -213,7 +214,7 @@ public class NeuralNetwork
         this.Layers = TempLayerList.ToArray();
     }
 
-    public void FeedForward(List<double> Inputs)
+    public void FeedForward(List<double> Inputs,List<int> ActivationFunctionIDs,bool NormalizeOutput = false)
     {
         int X = 1;
         int Y = 0;
@@ -222,26 +223,35 @@ public class NeuralNetwork
         double NetSignal2 = 0;
         List<double> TempList = new List<double>();
         double SoftmaxTotal = 0;
+        double TempVal = 0;
+        List<double> TempList2 = new List<double>();
 
-        //Scale IO
-        //Y = 0;
-        //while(Y < Inputs.Count)
-        //{
-        //    Inputs[Y] = Inputs[Y] * this.IOScaleFactor;
-
-        //    Y++;
-        //}
-
-        //Inputs = ZeroCenterData(Inputs);
+        //Inputs = NormalizeDataSet(Inputs);
 
         //Set input layer neuron values to the input data values
         Y = 0;
-        while (Y < this.Layers[0].Neurons.Length)
+        while (Y < Inputs.Count)
         {
-            this.Layers[0].Neurons[Y].Value = Inputs[Y];
+            if(Double.IsNaN(Inputs[Y]) || Inputs[Y] < -12610000)
+            {
+                break;
+            }
+            TempList.Add(Inputs[Y]);
+
 
             Y++;
         }
+
+        TempList = NormalizeDataSet(TempList,NormalizationMethod);
+
+        Y = 0;
+        while(Y < TempList.Count)
+        {
+            this.Layers[0].Neurons[Y].Value = TempList[Y];
+
+            Y++;
+        }
+        //NormalizeLayerValues(this.Layers[0],1);
 
         while (X < this.Layers.Length)
         {
@@ -258,60 +268,56 @@ public class NeuralNetwork
                 {
                     NetSignal += this.Layers[X].Neurons[Y].Dendrites[Z].Weight * this.Layers[X - 1].Neurons[Z].Value;
 
+                    if(Double.IsNaN(NetSignal))
+                    {
+                        break;
+                    }
+
                     Z++;
                 }
 
                 //#HERE
                 if(X < this.Layers.Length - 1)
                 {
-                    NetSignal += (this.Layers[X].BiasNeuron.Value * this.Layers[X].BiasNeuron.Weight);
-                }
-                
-
-                this.Layers[X].Neurons[Y].NetInput = NetSignal;
-
-                //if (X == this.Layers.Length - 1)
-                //{
-                //    this.Layers[X].Neurons[Y].Value = this.ActivationFunction(this.Layers[X].Neurons[Y], 2);
-                //}
-                //if (X == this.Layers.Length - 1)
-                //{
-                //    this.Layers[X].Neurons[Y].Value = this.ActivationFunction(this.Layers[X].Neurons[Y], 4);
-                //}
-                //else
-                //{
-
-                NetSignal = this.ActivationFunction(this.Layers[X].Neurons[Y], this.ActivationFunctionID);
-
-                if(double.IsNaN(NetSignal))
-                {
-                    //NetSignal = 1;
-                    break;
+                    //NetSignal += (this.Layers[X].BiasNeuron.Value * this.Layers[X].BiasNeuron.Weight);
                 }
 
-                this.Layers[X].Neurons[Y].Value = NetSignal;
 
+                TempList.Add(NetSignal);
+                //this.Layers[X].Neurons[Y].NetInput = NetSignal;
+                //NetSignal = this.ActivationFunction(this.Layers[X].Neurons[Y], this.ActivationFunctionID);
+                //this.Layers[X].Neurons[Y].Value = NetSignal;
+                //TempList.Add(NetSignal);
 
                 Y++;
             }
 
+            TempList2 = NormalizeDataSet(TempList, NormalizationMethod);
 
+            Y = 0;
+            while (Y < this.Layers[X].Neurons.Length)
+            {
+                if (X < this.Layers.Length - 1)
+                {
+                    this.Layers[X].Neurons[Y].NetInput = TempList2[Y];
+                    this.Layers[X].Neurons[Y].Value = this.ActivationFunction(this.Layers[X].Neurons[Y],ActivationFunctionIDs[X]);
+                }
+                else
+                {
+                    this.Layers[X].Neurons[Y].NetInput = TempList[Y];
+                    this.Layers[X].Neurons[Y].Value = this.ActivationFunction(this.Layers[X].Neurons[Y], ActivationFunctionIDs[X]);
+                }
+
+
+                if (Math.Abs(this.Layers[X].Neurons[Y].NetInput) > 1000 || Math.Abs(this.Layers[X].Neurons[Y].Value) > 1000) 
+                {
+                    //break;
+                }
+
+                Y++;
+            }
 
             X++;
-        }
-
-        Y = 0;
-        while (Y < this.Layers.Length)
-        {
-            X = 0;
-            while (X < this.Layers[Y].Neurons.Length)
-            {
-                this.Layers[Y].Neurons[X].Softmax = this.ActivationFunction(this.Layers[Y].Neurons[X], 4);
-                //this.Layers[this.Layers.Length - 1].Neurons[X].Value = this.Layers[this.Layers.Length - 1].Neurons[X].Softmax;
-
-                X++;
-            }
-            Y++;
         }
     }
 
@@ -340,9 +346,269 @@ public class NeuralNetwork
         return Inputs;
     }
 
+    public List<double> NormalizeDataSet(List<double> Inputs,int NormalizationMethod = 0)
+    {
+        int X = 0;
+        int Y = 0;
+        double TempVal = 0;
+        double StdDev = 0;
+        double TotalVal = 0;
+        List<double> TempList = new List<double>();
+        double MinVal = 0;
+        double MaxVal = 0;
+        int MinibatchSize = 100;
+        List<double> Outputs = new List<double>();
+
+        switch (NormalizationMethod)
+        {
+            case 0:
+                while(Y < Inputs.Count)
+                {
+                    X = 0;
+                    TempVal = 0;
+                    TempList = new List<double>();
+                    while (X < MinibatchSize)
+                    {
+                        if(Y+X >= Inputs.Count)
+                        {
+                            break;
+                        }    
+                        TempList.Add((Inputs[Y+X]));
+                        TempVal += (Inputs[Y+X]);
+
+                        X++;
+                    }
+
+                    TempVal /= TempList.Count;
+                    StdDev = CalculateStandardDeviation(TempList, TempVal);
+
+
+
+                    X = 0;
+                    while (X < TempList.Count)
+                    {
+                        if(StdDev == 0)
+                        {
+                            Outputs.Add(0);
+                        }
+                        else
+                        {
+                            Outputs.Add((TempList[X] - TempVal) / StdDev);
+                        }                        
+
+                        X++;
+                    }
+
+                    Y += MinibatchSize;
+                }
+
+                
+                
+                break;
+            case 1:
+                X = 0;
+                MinVal = Inputs[0];
+                MaxVal = Inputs[0];
+                while (X < Inputs.Count)
+                {
+                    if (Inputs[X] < MinVal)
+                    {
+                        MinVal = Inputs[X];
+                    }
+
+                    if (Inputs[X] > MaxVal)
+                    {
+                        MaxVal = Inputs[X];
+                    }
+
+                    X++;
+                }
+
+                X = 0;
+                while (X < Inputs.Count)
+                {
+                    Outputs.Add((Inputs[X] - MinVal) / (MaxVal - MinVal));
+
+                    X++;
+                }
+                break;
+            case 2:
+                TempVal = 0;
+                X = 0;
+                while (X < Inputs.Count)
+                {
+                    TempVal += Inputs[X];
+
+                    X++;
+                }
+
+                X = 0;
+                while (X < Inputs.Count)
+                {
+                    Outputs.Add(Inputs[X] / TempVal);
+
+                    X++;
+                }
+                break;
+        }
+
+        return Outputs;
+    }
+
+    public double CalculateMean(List<double> Inputs)
+    {
+        double TempVal = 0;
+        int X = 0;
+
+        while(X < Inputs.Count)
+        {
+            TempVal += Inputs[X];
+
+            X++;
+        }
+
+        return TempVal / Inputs.Count;
+    }
+
+
+
+    public void NormalizeLayerWeights(Layer Input)
+    {
+        int X = 0;
+        int Y = 0;
+        int Z = 0;
+        double TempVal = 0;
+        double StdDev = 0;
+        double TotalVal = 0;
+        List<double> TempList = new List<double>();
+
+        while (X < Input.Neurons.Length)
+        {
+            TempList = new List<double>();
+            Y = 0;
+            while(Y < Input.Neurons[X].Dendrites.Length)
+            {
+                TempList.Add(Input.Neurons[X].Dendrites[Y].Weight);
+                TempVal += Input.Neurons[X].Dendrites[Y].Weight;
+
+                Y++;
+            }
+
+            TempList = NormalizeDataSet(TempList, NormalizationMethod);
+
+            Y = 0;
+            while (Y < Input.Neurons[X].Dendrites.Length)
+            {
+               if(double.IsNaN(TempList[Y]))
+                {
+                    break;
+                }
+
+               Input.Neurons[X].Dendrites[Y].Weight = TempList[Y];
+
+                Y++;
+            }
+
+            X++;
+        }
+    }
+
+    public void NormalizeLayerValues(Layer Input,int NormalizationMethod = 2)
+    {
+        int X = 0;
+        int Y = 0;
+        double TempVal = 0;
+        double StdDev = 0;
+        double TotalVal = 0;
+        List<double> TempList = new List<double>();
+        double MinVal = 0;
+        double MaxVal = 0;
+
+        switch(NormalizationMethod)
+        {
+            case 0:
+                while (X < Input.Neurons.Length)
+                {
+                    TempList.Add((Input.Neurons[X].Value));
+                    TempVal += (Input.Neurons[X].Value);
+
+                    X++;
+                }
+
+                TempVal /= Input.Neurons.Length;
+                StdDev = CalculateStandardDeviation(TempList, TempVal);
+
+                X = 0;
+                while (X < Input.Neurons.Length)
+                {
+                    Input.Neurons[X].Value = (Input.Neurons[X].Value - TempVal) / StdDev;
+
+                    if (Double.IsNaN(Input.Neurons[X].Value))
+                    {
+                        break;
+                    }
+
+                    X++;
+                }
+                break;
+            case 1:
+                X = 0;
+                MinVal = Input.Neurons[0].Value;
+                MaxVal = Input.Neurons[0].Value;
+                while(X < Input.Neurons.Length)
+                {
+                    if(Input.Neurons[X].Value < MinVal)
+                    {
+                        MinVal = Input.Neurons[X].Value;
+                    }
+
+                    if (Input.Neurons[X].Value > MaxVal)
+                    {
+                        MaxVal = Input.Neurons[X].Value;
+                    }
+
+                    X++;
+                }
+
+                X = 0;
+                while(X < Input.Neurons.Length)
+                {
+                    Input.Neurons[X].Value = (Input.Neurons[X].Value - MinVal) / (MaxVal - MinVal);
+
+                    if(Input.Neurons[X].Value > 1000)
+                    {
+                        break;
+                    }
+
+                    X++;
+                }    
+                break;
+
+            case 2:
+                TempVal = 0;
+                X = 0;
+                while(X < Input.Neurons.Length)
+                {
+                    TempVal += Input.Neurons[X].Value;
+
+                    X++;
+                }
+
+                X = 0;
+                while(X < Input.Neurons.Length)
+                {
+                    Input.Neurons[X].Value /= TempVal;
+
+                    X++;
+                }
+                break;
+        }
+
+    }
+
     public void UpdateLearningRate(int Epoch)
     {
-        this.LearningRate = (1 / (1 + 0.00001 * Epoch)) * this.InitialLearningRate;
+        this.LearningRate *= (1.0f / (1.0f + (this.LearningRate / Epoch) * Epoch));
     }
 
     //Uses MSE (Mean Squared Error)
@@ -386,7 +652,7 @@ public class NeuralNetwork
     }
 
   
-    public void BackPropagate2(List<double> Inputs, List<double> Actuals,int LossFunctionID = 0)
+    public void BackPropagate2(List<double> Inputs, List<double> Actuals,List<int> ActivationFunctionIDs,List<int> LossFunctionIDs,bool NormalizeOutput = false)
     {
         int X = 0;
         int Y = 0;
@@ -401,7 +667,7 @@ public class NeuralNetwork
         List<List<double>> TempWeights2 = new List<List<double>>();
 
         //To have an error value to mitigate, we must first generate output for the network
-        this.FeedForward(Inputs);
+        this.FeedForward(Inputs,ActivationFunctionIDs,NormalizeOutput);
 
         X = this.Layers.Length - 1;
         this.Layers[X].TotalLayerError = 0;
@@ -411,68 +677,22 @@ public class NeuralNetwork
         Y = 0;
         while (Y < this.Layers[X].Neurons.Length)
         {
-            //This error value is only for measuring network performance, look up Mean Squared Error
-            
-            switch(LossFunctionID)
-            {
-                //MSE
-                case 0:
-                    TempVal = ((this.Layers[X].Neurons[Y].Value - Actuals[Y]) * (this.Layers[X].Neurons[Y].Value - Actuals[Y])) * (1.0f/this.Layers[this.Layers.Length - 1].Neurons.Length);
-                    break;
-                //Binary cross entropy
-                case 1:
-                    TempVal = (Actuals[Y] * Math.Log(this.Layers[X].Neurons[0].Softmax) + (1 - Actuals[Y]) * Math.Log(1 - this.Layers[X].Neurons[1].Softmax)) * (-1.0f/ this.Layers[X].Neurons.Length);
-                    break;
-                case 2:
-                    TempVal = Math.Log(this.Layers[X].Neurons[Y].Softmax) + Math.Log(1 - this.Layers[X].Neurons[Y].Softmax);
-                    break;
-                case 3:
-                    TempVal = 0;
-                    Z = 0;
-                    while(Z < this.Layers[X].Neurons.Length)
-                    {
-                        TempVal += this.Layers[X].Neurons[Z].Value * Actuals[Y];
-
-                        Z++;
-                    }
-
-                    TempVal = TempVal / this.Layers[X].Neurons.Length;
-
-                    break;
-                case 4:
-                    TempVal = 0;
-                    Z = 0;
-                    while (Z < this.Layers[X].Neurons.Length)
-                    {
-                        TempVal += this.Layers[X].Neurons[Z].Value;
-
-                        Z++;
-                    }
-
-                    TempVal = TempVal / this.Layers[X].Neurons.Length;
-                    TempVal = -1 * TempVal;
-
-                    break;
-
-                default:
-                    TempVal = ((this.Layers[X].Neurons[Y].Value - Actuals[Y]) * (this.Layers[X].Neurons[Y].Value - Actuals[Y])) * (1.0f / this.Layers[this.Layers.Length - 1].Neurons.Length);
-                    break;
-            }
-
-
-
-
             //Actual error value of the output neuron
-            //this.Layers[X].Neurons[Y].Error = this.Layers[X].Neurons[Y].Value - Actuals[Y];
-            this.Layers[X].Neurons[Y].Error = TempVal;
+            this.Layers[X].Neurons[Y].Error = this.Layers[X].Neurons[Y].Value - Actuals[Y];
+            //this.Layers[X].Neurons[Y].Error = (this.Layers[X].Neurons[Y].Value - Actuals[Y]) * (this.Layers[X].Neurons[Y].Value - Actuals[Y]) / (this.Layers[X].Neurons.Length);
 
             TempWeights = new List<double>();
             Z = 0;
             while (Z < this.Layers[X].Neurons[Y].Dendrites.Length)
             {
-                TempVal = (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y], this.ActivationFunctionID);
-                TempVal2 = (double)(this.Layers[X].Neurons[Y].Value - Actuals[Y]) * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y], this.ActivationFunctionID) * (this.Layers[X - 1].Neurons[Z].Value);
+                TempVal = (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y], ActivationFunctionIDs[X]);
+                TempVal2 = (double)this.Layers[X].Neurons[Y].Error * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y], ActivationFunctionIDs[X]) * (this.Layers[X - 1].Neurons[Z].Value);
                 TempVal3 = (this.Layers[X].Neurons[Y].Dendrites[Z].Weight - TempVal2 * (double)this.LearningRate);
+
+                if(double.IsNaN(TempVal3))
+                {
+                    break;
+                }
 
                 TempWeights.Add(this.Layers[X].Neurons[Y].Dendrites[Z].Weight - TempVal2 * (double)this.LearningRate * this.Momentum);
 
@@ -500,13 +720,20 @@ public class NeuralNetwork
                 Z = 0;
                 while (Z < this.Layers[X + 1].Neurons.Length)
                 {
-                    TempVal = (double)(this.Layers[X + 1].Neurons[Z].Error) * (double)this.ActivationFunctionDerivative(this.Layers[X + 1].Neurons[Z], this.ActivationFunctionID) * this.Layers[X + 1].Neurons[Z].Dendrites[Y].Weight;
-                    TempVal2 += TempVal;
+                    //TempVal = (double)(this.Layers[X + 1].Neurons[Z].Error) * (double)this.ActivationFunctionDerivative(this.Layers[X + 1].Neurons[Z], ActivationFunctionIDs[X]) * this.Layers[X + 1].Neurons[Z].Dendrites[Y].Weight;
+                    TempVal = (double)this.ActivationFunctionDerivative(this.Layers[X + 1].Neurons[Z], ActivationFunctionIDs[X]) * this.Layers[X + 1].Neurons[Z].Dendrites[Y].Weight;
+                    TempVal2 += TempVal;                    
 
                     Z++;
                 }
 
+                TempVal2 = TempVal2 / (double)this.Layers[X + 1].Neurons.Length;
                 this.Layers[X].Neurons[Y].Error = TempVal2;
+
+                if (Double.IsNaN(TempVal2))
+                {
+                    break;
+                }               
 
                 TempVal3 = 0;
                 Z = 0;
@@ -514,14 +741,19 @@ public class NeuralNetwork
                 {
                     if (X == 0)
                     {
-                        TempVal3 = (double)TempVal2 * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y], this.ActivationFunctionID) * (Inputs[Z]);
+                        TempVal3 = (double)TempVal2 * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y], ActivationFunctionIDs[X]) * (Inputs[Z]);
                     }
                     else
                     {
-                        TempVal3 = (double)TempVal2 * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y], this.ActivationFunctionID) * (this.Layers[X - 1].Neurons[Z].Value);
+                        TempVal3 = (double)TempVal2 * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y], ActivationFunctionIDs[X]) * (this.Layers[X - 1].Neurons[Z].Value);
                     }
 
                     TempVal4 = this.Layers[X].Neurons[Y].Dendrites[Z].Weight - TempVal3 * (double)this.LearningRate;
+
+                    if(double.IsNaN(TempVal4))
+                    {
+                        break;
+                    }
 
                     TempWeights.Add(this.Layers[X].Neurons[Y].Dendrites[Z].Weight - TempVal3 * (double)this.LearningRate * this.Momentum);
 
@@ -556,11 +788,89 @@ public class NeuralNetwork
                 Y++;
             }
 
+            if(X < this.Layers.Length - 1)
+            {
+                NormalizeLayerWeights(this.Layers[X]);
+            }
+            
+            
+
             X++;
         }
     }
 
-    public void BackPropagate(List<double> Inputs, List<double> Actuals)
+    public double LossFunction(double InputVal, double ExpectedVal,int LayerID, int FunctionID)
+    {
+        double Output = 0;
+        int X;
+
+        switch(FunctionID)
+        {
+            case 0:
+                Output = (InputVal - ExpectedVal) * (InputVal - ExpectedVal) / this.Layers[LayerID].Neurons.Length;
+
+                break;
+            case 1:
+                X = 0;
+
+                Output = 1 - (ExpectedVal * InputVal);
+                break;
+        }
+
+
+        return Output;
+    }
+
+    public double CalculateStandardDeviation(List<double> Inputs,double Mean = 0.0f)
+    {
+        double Variance = 0;
+        int X = 0;
+
+        if(Mean == 0)
+        {
+            while (X < Inputs.Count)
+            {
+                Mean += Inputs[X];
+
+                X++;
+            }
+
+            Mean /= Inputs.Count;
+        }
+
+        X = 0;
+        while(X < Inputs.Count)
+        {
+            Variance += Math.Pow(Inputs[X] - Mean,2);
+
+            X++;
+        }
+
+        Variance /= Inputs.Count;
+
+        return Math.Sqrt(Variance);
+    }
+
+    public double ZScore(List<double> Inputs,double SamplePoint,double Mean = 0.0f)
+    {
+        int X = 0;
+
+        if(Mean == 0)
+        {
+            while (X < Inputs.Count)
+            {
+                Mean += Inputs[X];
+
+                X++;
+            }
+
+            Mean /= Inputs.Count;
+        }
+
+        return (SamplePoint - Mean) / CalculateStandardDeviation(Inputs);
+    }
+
+    public void BackPropagateError(List<double> Inputs)
     {
         int X = 0;
         int Y = 0;
@@ -573,28 +883,13 @@ public class NeuralNetwork
         List<List<List<double>>> NewWeights = new List<List<List<double>>>();
         List<double> TempWeights = new List<double>();
         List<List<double>> TempWeights2 = new List<List<double>>();
+        double StdDev = 0;
 
         //To have an error value to mitigate, we must first generate output for the network
 
+        //this.FeedForward(Inputs);
 
-        //Scale IO
-        Y = 0;
-        while(Y < Inputs.Count)
-        {
-            Inputs[Y] = Inputs[Y] * this.IOScaleFactor;
-
-            Y++;
-        }
-
-        Y = 0;
-        while (Y < Actuals.Count)
-        {
-            Actuals[Y] = Actuals[Y] * this.IOScaleFactor;
-
-            Y++;
-        }
-
-        this.FeedForward(Inputs);
+        //Inputs = NormalizeDataSet(Inputs,1);
 
         X = this.Layers.Length - 1;
         this.Layers[X].TotalLayerError = 0;
@@ -604,41 +899,36 @@ public class NeuralNetwork
         Y = 0;
         while (Y < this.Layers[X].Neurons.Length)
         {
-            //Mean Squared Error
-            TempVal = (((this.Layers[X].Neurons[Y].Value - Actuals[Y]) * (this.Layers[X].Neurons[Y].Value - Actuals[Y])) * (1.0f / (double)this.Layers[this.Layers.Length - 1].Neurons.Length));
+            //TempVal = (0 * Math.Log(Inputs[Y]) + (1 - 0) * Math.Log(1 - Inputs[Y])) ;
+            //TempVal = (Inputs[Y] * Inputs[Y]) / this.Layers[X].Neurons.Length;
+            TempVal = (Inputs[Y]);
 
-            //Cross Entropy Loss
-            //if (Actuals[Y] == 0)
-            //{
-            //    TempVal = -1 * Math.Log(this.Layers[X].Neurons[Y].Softmax);
-            //}
-            //else
-            //{
-            //    TempVal = -1 * Math.Log(1 - this.Layers[X].Neurons[Y].Softmax);
-            //}
-
-
-
-            if (Double.IsNaN(TempVal))
-            {
-                break;
-            }
-
-            this.Layers[X].Neurons[Y].Error = TempVal;
+            this.Layers[X].Neurons[Y].Error = (TempVal);
 
             TempWeights = new List<double>();
             Z = 0;
             while (Z < this.Layers[X].Neurons[Y].Dendrites.Length)
             {
-                TempVal2 = this.Layers[X - 1].Neurons[Z].Value * this.Layers[X].Neurons[Y].Error;
+                TempVal2 = this.Layers[X].Neurons[Y].Error;
                 //TempVal2 = this.Layers[X - 1].Neurons[Z].Value * (this.Layers[X].Neurons[Y].Value - Actuals[Y]);
 
                 //TempVal = this.Layers[X - 1].Neurons[Z].Value * (this.Layers[X].Neurons[Y].Softmax - Actuals[Y]);
-                ////TempVal2 = (double)(this.Layers[X].Neurons[Y].Softmax - Actuals[Y]) * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y], 4,Actuals[Y]) * (this.Layers[X - 1].Neurons[Z].Value);
-                //TempVal2 = (double)(TempVal) * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y], 4, Actuals[Y]) * (this.Layers[X - 1].Neurons[Z].Value);
+                //TempVal2 = Inputs[Y] * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y], 4,Actuals[Y]) * (this.Layers[X - 1].Neurons[Z].Value);
+                
+                //TempVal2 = (double)(TempVal) * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y], ActivationFunctionID) * (this.Layers[X - 1].Neurons[Z].Value);
+                
                 //TempVal3 = (this.Layers[X].Neurons[Y].Dendrites[Z].Weight - TempVal2 * (double)this.LearningRate);
+                //TempVal2 = this.Layers[X].Neurons[Y].Dendrites[Z].Weight - TempVal2 * this.LearningRate * this.Momentum;
 
-                TempWeights.Add(this.Layers[X].Neurons[Y].Dendrites[Z].Weight - (TempVal2 * (double)this.LearningRate * this.Momentum));
+                //TempWeights.Add(Inputs[Y]);
+                TempVal = this.Layers[X].Neurons[Y].Dendrites[Z].Weight - (TempVal2) * this.LearningRate * this.Momentum;
+
+                if(double.IsNaN(TempVal))
+                {
+                    break;
+                }
+
+                TempWeights.Add(TempVal);
 
                 Z++;
             }
@@ -664,19 +954,19 @@ public class NeuralNetwork
                 Z = 0;
                 while (Z < this.Layers[X + 1].Neurons.Length)
                 {
-                    TempVal = (double)(this.Layers[X + 1].Neurons[Z].Error) * (double)this.ActivationFunctionDerivative(this.Layers[X + 1].Neurons[Z],this.ActivationFunctionID) * this.Layers[X + 1].Neurons[Z].Dendrites[Y].Weight;
-                    
-                    if(Double.IsInfinity(TempVal))
+                    TempVal = (double)(this.Layers[X + 1].Neurons[Z].Error) * (double)this.ActivationFunctionDerivative(this.Layers[X + 1].Neurons[Z], this.ActivationFunctionID) * this.Layers[X + 1].Neurons[Z].Dendrites[Y].Weight;
+
+                    if (Double.IsInfinity(TempVal))
                     {
                         break;
                     }
-                    
+
                     TempVal2 += TempVal;
 
                     Z++;
                 }
 
-                if(Double.IsNaN(TempVal2))
+                if (Double.IsNaN(TempVal2))
                 {
                     //TempVal2 = 1;
                     break;
@@ -690,19 +980,24 @@ public class NeuralNetwork
                 {
                     if (X == 0)
                     {
-                        TempVal3 = (double)TempVal2 * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y],this.ActivationFunctionID) * (Inputs[Z]);
+                        TempVal3 = (double)TempVal2 * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y], this.ActivationFunctionID) * (Inputs[Z]);
                     }
                     else
                     {
                         TempVal3 = (double)TempVal2 * (double)this.ActivationFunctionDerivative(this.Layers[X].Neurons[Y], this.ActivationFunctionID) * (this.Layers[X - 1].Neurons[Z].Value);
                     }
 
-                    if(Double.IsNaN(TempVal3))
+                    if (Double.IsNaN(TempVal3))
                     {
                         break;
                     }
 
                     TempVal4 = this.Layers[X].Neurons[Y].Dendrites[Z].Weight - TempVal3 * (double)this.LearningRate;
+
+                    if(double.IsNaN(TempVal4))
+                    {
+                        break;
+                    }
 
                     //Bias update
                     //this.Layers[X].BiasNeuron.Weight -= this.LearningRate * TempVal3;
@@ -712,7 +1007,7 @@ public class NeuralNetwork
                     {
                         this.Layers[X].BiasNeuron.Weight = GradientClipFactor;
                     }
-                    else if(this.Layers[X].BiasNeuron.Weight < -1 * GradientClipFactor)
+                    else if (this.Layers[X].BiasNeuron.Weight < -1 * GradientClipFactor)
                     {
                         this.Layers[X].BiasNeuron.Weight = -1 * GradientClipFactor;
                     }
@@ -742,7 +1037,7 @@ public class NeuralNetwork
                 Z = 0;
                 while (Z < NewWeights[X][Y].Count)
                 {
-                    if(Double.IsNaN(NewWeights[X][Y][Z]))
+                    if (Double.IsNaN(NewWeights[X][Y][Z]))
                     {
                         break;
                     }
@@ -754,7 +1049,7 @@ public class NeuralNetwork
                     {
                         this.Layers[this.Layers.Length - 1 - X].Neurons[Y].Dendrites[Z].Weight = GradientClipFactor;
                     }
-                    else if(NewWeights[X][Y][Z] < -1 * GradientClipFactor)
+                    else if (NewWeights[X][Y][Z] < -1 * GradientClipFactor)
                     {
                         this.Layers[this.Layers.Length - 1 - X].Neurons[Y].Dendrites[Z].Weight = -1 * GradientClipFactor;
                     }
@@ -765,6 +1060,13 @@ public class NeuralNetwork
 
                 Y++;
             }
+
+            if(X < this.Layers.Length - 1)
+            {
+                NormalizeLayerWeights(this.Layers[X]);
+            }
+            
+            
 
             X++;
         }
@@ -939,7 +1241,7 @@ public class NeuralNetwork
                     //TempVal = 1;
                 }
 
-                if(TempVal == 0 || TempVal  > 255)
+                if(TempVal == 1 )
                 {
                    // break;
                 }
@@ -953,48 +1255,47 @@ public class NeuralNetwork
 
                 TempVal = TempVal2 / (TempVal2 + 1);
 
-                if(TempVal > 1)
+                if(Double.IsNaN(TempVal))
                 {
-                    //break;
+                    TempVal = 1;
                 }
 
                 //TempVal = (double)(1.0f / (1.0f + (Math.Pow((double)Math.E, -1.0f * (InputVal.NetInput)))));
                 break;
-            //Leaky ReLu (Regressive Linear Unit)
+            //ELU
             case 3:
-                if(InputVal.NetInput > 0)
+                if(InputVal.NetInput >= 0)
                 {
                     TempVal = InputVal.NetInput;
                 }
                 else
                 {
-                    TempVal = InputVal.NetInput * ReLUConst;
+                    TempVal = ReLUConst * (Math.Exp(InputVal.NetInput) - 1);
                 }
-
                 if(Double.IsNaN(TempVal))
                 {
                     //TempVal = 1;
                     break;
                 }
 
+                if(TempVal == 0)
+                {
+                    //break;
+                }
+
                 break;
             case 4:
-                //Softmax
-                TempVal2 = 0;
-                X = 0;
-                while(X < this.Layers[InputVal.Layer].Neurons.Length)
+                //ReLU
+                if (InputVal.NetInput < 0)
                 {
-                    TempVal2 += Math.Exp(this.Layers[InputVal.Layer].Neurons[X].NetInput);
-
-                    X++;
+                    TempVal = ReLUConst * InputVal.NetInput;
                 }
-
-                TempVal = Math.Exp(InputVal.NetInput) / TempVal2;
-
-                if(Double.IsNaN(TempVal))
+                else
                 {
-                    break;
+                    TempVal = InputVal.NetInput;
                 }
+                
+                
 
                 break;
         }
@@ -1016,27 +1317,20 @@ public class NeuralNetwork
             //TanH
             case 1:
                 TempVal = (double)(1 - (Math.Tanh(InputVal.NetInput) * Math.Tanh(InputVal.NetInput)));
-                if(TempVal == 0 || TempVal > 255)
+                if (TempVal == 0 || TempVal > 255)
                 {
                     //break;
                 }
                 break;
             //Logistic Sigmoid
             case 2:
-                TempVal = this.ActivationFunction(InputVal,2) * (1 - this.ActivationFunction(InputVal,2));
+                TempVal = this.ActivationFunction(InputVal, 2) * (1 - this.ActivationFunction(InputVal, 2));
                 break;
             //Leaky ReLu (Regressive Linear Unit)
             case 3:
-                if(InputVal.NetInput < 0)
-                {
-                    TempVal = ReLUConst;
-                }
-                else
-                {
-                    TempVal = 1;
-                }
+                TempVal = this.ActivationFunction(InputVal, 3) + ReLUConst;
 
-                if(Double.IsNaN(TempVal))
+                if (Double.IsNaN(TempVal))
                 {
                     break;
                 }
@@ -1044,8 +1338,15 @@ public class NeuralNetwork
                 break;
             //Softmax
             case 4:
-                X = 0;
-                TempVal = InputVal.Softmax * (1 - InputVal.Softmax);
+                if (InputVal.NetInput >= 0)
+                {
+                    TempVal = 1;
+                }
+                else
+                {
+                    TempVal = ReLUConst;
+                }
+
 
 
                 break;
